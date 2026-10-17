@@ -14,7 +14,7 @@ data/           Output location for optional precomputed preset results
 MODELING.md     Scientific modeling description
 ```
 
-The frontend calls `/api/config` and `/api/predict`. The backend validates and normalizes every enzyme's four-compartment distribution plus the tunable physiology parameters, then calls `model_core` to solve the steady-state glycosylation model.
+The frontend calls `/api/config` and `/api/predict`. The backend validates and normalizes every enzyme's four-compartment distribution of location plus the tunable physiology parameters, then calls `model_core` to solve the steady-state glycosylation model.
 
 ## Requirements
 

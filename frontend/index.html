@@ -84,7 +84,7 @@
           <section class="control-group distribution-group" aria-labelledby="distribution-heading">
             <div class="distribution-heading-row">
               <div>
-                <h2 id="distribution-heading">Enzyme compartment distribution</h2>
+                <h2 id="distribution-heading">Enzyme distribution of location</h2>
                 <p>
                   Edit one compartment and the unlocked remainder is redistributed proportionally.
                   Each row always totals 100%.
@@ -180,7 +180,7 @@
               :disabled="computing"
               @click="runSimulation"
             >
-              {{ computing ? 'Computing steady-state model…' : (resultStale ? 'Run updated simulation' : 'Run simulation') }}
+              {{ computing ? 'Computing steady-state model…' : (resultStale ? 'Run simulation' : 'Run simulation') }}
             </button>
             <button
               v-if="computing"
