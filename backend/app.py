@@ -28,13 +28,11 @@ def handle_predict():
                 ...
             },
             "donorConcs": {"UDP-GlcNAc": 9200, ...},   # optional
-            "tau": 5.56,                                # optional
-            "compartmentVolume": 2.5,                   # optional
-            "proteinProdRate": 1000                     # optional
+            "totGlycanConc": 2224.0                    # optional
         }
 
-    Response echoes the applied parameters (including the derived
-    ``totGlycanConc``) along with ``total`` and ``top`` glycoforms.
+    Response echoes the applied parameters (including ``totGlycanConc``)
+    along with ``total`` and ``top`` glycoforms.
     """
     data = request.get_json(silent=True) or {}
     if 'enzymeDistribution' not in data:
@@ -47,9 +45,7 @@ def handle_predict():
             data['enzymeDistribution'],
             donor_concs=data.get('donorConcs'),
             enzyme_concs=data.get('enzymeConcs'),
-            tau=data.get('tau'),
-            compartment_volume=data.get('compartmentVolume'),
-            protein_prod_rate=data.get('proteinProdRate'),
+            tot_glycan_conc=data.get('totGlycanConc'),
             top_n=15,
         )
         return jsonify(result)

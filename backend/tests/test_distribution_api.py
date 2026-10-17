@@ -73,35 +73,22 @@ class DistributionApiTests(unittest.TestCase):
             api._distribution_to_dist_matrix(self.baseline),
         )
         self.assertEqual(result["top"], [])
-        self.assertAlmostEqual(result["tau"], api.DEFAULT_TAU)
-        self.assertAlmostEqual(result["compartmentVolume"], api.DEFAULT_COMPARTMENT_VOLUME)
-        self.assertAlmostEqual(result["proteinProdRate"], api.DEFAULT_PROTEIN_PROD_RATE)
-        self.assertAlmostEqual(
-            result["totGlycanConc"],
-            api.DEFAULT_PROTEIN_PROD_RATE * api.DEFAULT_TAU / api.DEFAULT_COMPARTMENT_VOLUME,
-        )
+        self.assertAlmostEqual(result["totGlycanConc"], api.DEFAULT_TOT_GLYCAN_CONC)
 
     def test_predict_applies_scalar_overrides(self):
         with mock.patch.object(api, "_run_model", return_value={"total": 1.0, "top": []}) as solver:
-            result = api.predict(
-                self.baseline,
-                tau=7.5,
-                compartment_volume=3.0,
-                protein_prod_rate=500.0,
-            )
-        _, _, _, tau_v, vol_v, rate_v, _ = solver.call_args.args
-        self.assertEqual(tau_v, 7.5)
-        self.assertEqual(vol_v, 3.0)
-        self.assertEqual(rate_v, 500.0)
-        self.assertAlmostEqual(result["totGlycanConc"], 500.0 * 7.5 / 3.0)
+            result = api.predict(self.baseline, tot_glycan_conc=1500.0)
+        _, _, _, glycan_v, _ = solver.call_args.args
+        self.assertEqual(glycan_v, 1500.0)
+        self.assertAlmostEqual(result["totGlycanConc"], 1500.0)
 
     def test_predict_rejects_out_of_range_scalars(self):
         bad_calls = [
-            ({"tau": -1.0},),
-            ({"tau": 1000.0},),
-            ({"compartment_volume": 0.0},),
-            ({"protein_prod_rate": float("nan")},),
-            ({"protein_prod_rate": "fast"},),
+            ({"tot_glycan_conc": -1.0},),
+            ({"tot_glycan_conc": 0.0},),
+            ({"tot_glycan_conc": 1e9},),
+            ({"tot_glycan_conc": float("nan")},),
+            ({"tot_glycan_conc": "high"},),
         ]
         for kwargs in bad_calls:
             with self.subTest(kwargs=kwargs):
@@ -137,7 +124,7 @@ class DistributionApiTests(unittest.TestCase):
         fake_result = {"total": 1.0, "top": []}
         with mock.patch.object(api, "_run_model", return_value=fake_result) as solver:
             api.predict(self.baseline)
-            api.predict(self.baseline, tau=10.0)
+            api.predict(self.baseline, tot_glycan_conc=3000.0)
             api.predict(self.baseline, donor_concs={"GDP-Fuc": 4000.0})
         self.assertEqual(solver.call_count, 3)
 
@@ -185,10 +172,11 @@ class FlaskContractTests(unittest.TestCase):
         self.assertEqual(data["compartments"], ["CGC", "MGC", "TGC", "TGN"])
         self.assertEqual(set(data["baselineDistribution"]), set(data["enzymeNames"]))
         self.assertIn("donorDefaults", data)
-        self.assertIn("tauDefault", data)
-        self.assertIn("compartmentVolumeDefault", data)
-        self.assertIn("proteinProdRateDefault", data)
         self.assertIn("totGlycanConcDefault", data)
+        self.assertIn("totGlycanConcBounds", data)
+        self.assertNotIn("tauDefault", data)
+        self.assertNotIn("compartmentVolumeDefault", data)
+        self.assertNotIn("proteinProdRateDefault", data)
         self.assertNotIn("promoterLevels", data)
         self.assertNotIn("enzymePresets", data)
 
@@ -205,7 +193,7 @@ class FlaskContractTests(unittest.TestCase):
         with mock.patch.object(flask_app, "predict") as predictor:
             response = self.client.post(
                 "/api/predict",
-                json={"tau": 5.56},
+                json={"totGlycanConc": 2224.0},
             )
         self.assertEqual(response.status_code, 400)
         self.assertIn("enzymeDistribution is required", response.get_json()["error"])
@@ -225,7 +213,7 @@ class FlaskContractTests(unittest.TestCase):
         with mock.patch.object(api, "_run_model") as solver:
             response = self.client.post(
                 "/api/predict",
-                json={"enzymeDistribution": distribution, "tau": -1.0},
+                json={"enzymeDistribution": distribution, "totGlycanConc": -1.0},
             )
         self.assertEqual(response.status_code, 400)
         solver.assert_not_called()
@@ -239,19 +227,14 @@ class FlaskContractTests(unittest.TestCase):
                 "/api/predict",
                 json={
                     "enzymeDistribution": distribution,
-                    "tau": 7.0,
-                    "proteinProdRate": 800.0,
+                    "totGlycanConc": 1500.0,
                 },
             )
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertIn("enzymeDistribution", data)
         self.assertFalse(data["cacheHit"])
-        self.assertEqual(data["tau"], 7.0)
-        self.assertEqual(data["proteinProdRate"], 800.0)
-        self.assertAlmostEqual(
-            data["totGlycanConc"], 800.0 * 7.0 / api.DEFAULT_COMPARTMENT_VOLUME
-        )
+        self.assertEqual(data["totGlycanConc"], 1500.0)
         for profile in data["enzymeDistribution"].values():
             self.assertAlmostEqual(sum(profile.values()), 1)
 

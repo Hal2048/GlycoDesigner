@@ -26,9 +26,7 @@ function cloneDistribution(distribution) {
 
 function defaultParams(config) {
   return {
-    tau: config.tauDefault,
-    compartmentVolume: config.compartmentVolumeDefault,
-    proteinProdRate: config.proteinProdRateDefault,
+    totGlycanConc: config.totGlycanConcDefault,
     donorConcs: { ...config.donorDefaults },
     enzymeConcs: { ...config.enzymeConcDefaults },
   }
@@ -110,12 +108,6 @@ createApp({
     let activeController = null
 
     const chartRows = computed(() => makeChartRows(result.value))
-
-    const totGlycanConc = computed(() => {
-      const p = params.value
-      if (!p) return NaN
-      return (p.proteinProdRate * p.tau) / p.compartmentVolume
-    })
 
     function emptyLocks() {
       return Object.fromEntries(config.value.enzymeNames.map(enzyme => [
@@ -288,9 +280,7 @@ createApp({
           body: JSON.stringify({
             enzymeDistribution: requestDistribution,
             enzymeConcs: requestParams.enzymeConcs,
-            tau: requestParams.tau,
-            compartmentVolume: requestParams.compartmentVolume,
-            proteinProdRate: requestParams.proteinProdRate,
+            totGlycanConc: requestParams.totGlycanConc,
             donorConcs: requestParams.donorConcs,
           }),
           signal: activeController.signal,
@@ -336,9 +326,7 @@ createApp({
     // Any edit to the physiology parameters invalidates the displayed result.
     watch(
       () => params.value && {
-        tau: params.value.tau,
-        v: params.value.compartmentVolume,
-        q: params.value.proteinProdRate,
+        g: params.value.totGlycanConc,
         d: params.value.donorConcs,
         e: params.value.enzymeConcs,
       },
@@ -359,7 +347,6 @@ createApp({
       cancelledMessage,
       chartRef,
       chartRows,
-      totGlycanConc,
       resetAll,
       resetEnzyme,
       toggleLock,

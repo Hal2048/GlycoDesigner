@@ -1,6 +1,6 @@
 # GlycoDesigner
 
-GlycoDesigner is an interactive simulator from Fudan iGEM 2026. It aims to explore how Golgi-compartment enzyme localization and cell-physiology parameters (donor concentrations, residence time, cisterna volume, protein production rate) affect predicted N-glycoform profiles.
+GlycoDesigner is an interactive simulator from Fudan iGEM 2026. It aims to explore how Golgi-compartment enzyme abundance, localization and cell-physiology parameters (donor concentrations, total glycan concentration) affect predicted N-glycoform profiles.
 
 This repository is self-contained: the browser interface, Flask API, precomputed data, and the model runtime required by the API are all included. The complete research notebooks and broader modeling record live in the separate [Fudan model repository](https://gitlab.igem.org/2026/software/fudan/model).
 
@@ -74,13 +74,11 @@ The health check uses `/api/config`. Live simulations can take up to several min
     "ManI": {"CGC": 0.05, "MGC": 0.15, "TGC": 0.40, "TGN": 0.40}
   },
   "donorConcs": {"UDP-GlcNAc": 9200, "UDP-Gal": 3800, "CMP-NeuAc": 2400, "GDP-Fuc": 5000, "GDP-Man": 2000},
-  "tau": 5.56,
-  "compartmentVolume": 2.5,
-  "proteinProdRate": 1000
+  "totGlycanConc": 2224.0
 }
 ```
 
-The abbreviated example shows one enzyme. Real requests must include every enzyme returned by `/api/config`. Each profile is normalized to 100 percent by both the API adapter and model layer. All physiology fields are optional; defaults come from `model_core/config.py`. The response echoes the applied parameters together with the derived `totGlycanConc = proteinProdRate · tau / compartmentVolume`.
+The abbreviated example shows one enzyme. Real requests must include every enzyme returned by `/api/config`. Each profile is normalized to 100 percent by both the API adapter and model layer. All physiology fields are optional; defaults come from `model_core/config.py`. The response echoes the applied parameters, including the total glycan concentration `totGlycanConc` (µM per compartment).
 
 ## Tests
 

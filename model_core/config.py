@@ -8,21 +8,17 @@ import numpy as np
 # Cell physiology parameters (scalar, user-tunable from the dashboard)
 # ----------------------------------------------------------------------------
 
-# Protein production rate (uM / min)
-PROTEIN_PROD_RATE = 1000.0
-
-# Volume of a single cisterna (uL)
-COMPARTMENT_VOLUME_SINGLE = 2.5
-
 # Residence time per compartment (CGC, MGC, TGC, TGN), in minutes.
+# Internal model parameter used by the steady-state solver; not exposed as a
+# dashboard control.
 tau = 5.56
 TAU = np.array([tau, tau, tau, tau])
 
-# Total glycan concentration per compartment (uM), derived from the physiology
-# parameters above. The dashboard surfaces the scalar formula
-#     TOT_GLYCAN_CONC = PROTEIN_PROD_RATE * tau / COMPARTMENT_VOLUME_SINGLE
-# and recomputes it whenever the user edits one of the factors.
-TOT_GLYCAN_CONC = PROTEIN_PROD_RATE * TAU / COMPARTMENT_VOLUME_SINGLE  # uM
+# Total glycan concentration per compartment (uM). This is the one
+# cell-influx parameter exposed in the dashboard and the user edits it
+# directly. The default reproduces the classic Krambeck physiology estimate
+#     q_p * tau / V_cisterna = 1000 uM/min * 5.56 min / 2.5 uL = 2224 uM.
+TOT_GLYCAN_CONC = 2224.0  # uM
 
 
 # ----------------------------------------------------------------------------

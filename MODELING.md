@@ -118,7 +118,7 @@ backend/api.py  (网络只构建一次，多次预测复用)
 
 集中管理所有可调参数：
 
-- **细胞生理参数**：`PROTEIN_PROD_RATE`（蛋白质生成速率 µM/min）、`COMPARTMENT_VOLUME_SINGLE`（单个 cisterna 体积 µL）、`TAU`（每室驻留时间 min），以及由此推导的 `TOT_GLYCAN_CONC = PROTEIN_PROD_RATE · TAU / COMPARTMENT_VOLUME_SINGLE`（µM）。前端把这三个标量作为可编辑控件，并按同一公式实时显示总糖链浓度。
+- **细胞生理参数**：`TOT_GLYCAN_CONC`（每室总糖链浓度 µM）是前端唯一暴露的糖链流入参数，用户直接输入；默认值 2224 µM 对应经典 Krambeck 生理估计 `q_p · τ / V_cisterna = 1000 · 5.56 / 2.5`。`TAU`（每室驻留时间 min）保留为求解器内部参数，不在界面上可调。
 - **供体浓度 `DONOR_CONC`**：UDP-GlcNAc、UDP-Gal、CMP-NeuAc、GDP-Fuc、GDP-Man，以及水解反应占位的 `H20 = 1`（用户不可调）。
 - **酶总浓度与分布 `ENZYME_CONC`**：以具体酶名（如 `ManI_9`、`GalT_Br2`）为键，每项 `[总浓度, [CGC, MGC, TGC, TGN] 分布比]`。
 - **兼容层**：dashboard 仍按 10 个基础酶组（ManI/ManII/FucT/GnTI/GnTII/GnTIII/GnTIV/GnTV/GalT/SiaT）接收四室分布。`_ENZYME_GROUP_MAP` 把 23 个具体酶名映射到基础组；`DIST_MATRIX` 是从 `ENZYME_CONC` 推导的 4×10 基线矩阵；`normalize_dist_matrix()` 校验形状、有限性、非负性和正的列和并按列归一化；`build_enzyme_dist(dist_matrix=None)` 把 4×10 基础矩阵展开成 `model_core` 需要的 `[{specific_name: concentration}, ...]` 格式。零浓度的酵母酶（Och1、Mnn9、GnTIII）不参与 UI 编辑，保持默认均匀分布。
@@ -342,7 +342,7 @@ final_concs.shape == (n_structures, 4)
 | `DONOR_CONC` | config.py | 糖供体浓度 |
 | `TOTAL_ENZYME_CONC` | config.py | 10 类酶总浓度 |
 | `DIST_MATRIX` | config.py | 酶在 4 个区室的分布比例 |
-| 初始 feed | `backend/api.py` | M9 和 M8 各 50%，总浓度 = `proteinProdRate · tau / compartmentVolume` |
+| 初始 feed | `backend/api.py` | M9 和 M8 各 50%，总浓度 = `totGlycanConc`（用户直接输入，默认 2224 µM） |
 
 ### 6.2 输出
 
@@ -364,11 +364,11 @@ final_concs.shape == (n_structures, 4)
 
 实际请求必须包含配置接口返回的全部 10 个基础酶组。后端拒绝缺失或未知的酶/区室、布尔值、非数字、非有限数、负数和四项全零的分布，然后再次归一化并将实际采用的 `enzymeDistribution` 放入预测响应。
 
-除分布外，`/api/predict` 还接受四个可调的细胞生理参数：`donorConcs`（5 种可调供体）、`tau`（驻留时间，min）、`compartmentVolume`（单 cisterna 体积，µL）、`proteinProdRate`（蛋白质生成速率，µM/min）。后端用与 `config.py` 相同的公式 `totGlycanConc = proteinProdRate · tau / compartmentVolume` 计算总糖链浓度，并以此构造 M9/M8 初始 feed（各占 50%）。所有参数都有上下界校验，默认值与 `model_core/config.py` 保持一致。
+除分布外，`/api/predict` 还接受可调的细胞生理参数：`donorConcs`（5 种可调供体）和 `totGlycanConc`（每室总糖链浓度，µM）。后端直接用 `totGlycanConc` 构造 M9/M8 初始 feed（各占 50%）；`tau`（驻留时间）保留为求解器内部参数，不再暴露给前端。所有参数都有上下界校验，默认值与 `model_core/config.py` 保持一致。
 
 用户界面（`frontend/`）提供：
 
-- 细胞生理参数卡片（τ、V、q 滑杆 + 数字输入；总糖链浓度实时显示，只读）；
+- 细胞生理参数卡片（总糖链浓度数字输入，可直接编辑）；
 - 5 种供体浓度的数字输入；
 - CGC、MGC、TGC、TGN 四区室直接输入；
 - 按比例联动、区室锁定、单酶重置和全部重置；
@@ -386,7 +386,7 @@ final_concs.shape == (n_structures, 4)
 - 竞争抑制计算
 - 稳态求解器框架 + 稀疏牛顿求解器
 - Software 四区室交互与严格分布校验
-- 可调细胞生理参数（τ、V、q、供体浓度）与总糖链浓度实时推导
+- 可调细胞生理参数（总糖链浓度、供体浓度），总糖链浓度由用户直接输入
 - 请求局部的分布/生理参数，不修改模型全局配置
 
 ### 8.2 计算限制

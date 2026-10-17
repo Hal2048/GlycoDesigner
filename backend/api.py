@@ -2,8 +2,8 @@
 
 This module loads the metabolic model once at import time and exposes
 functions to run it on demand for arbitrary enzyme compartment distributions
-and cell-physiology parameters (donor concentrations, residence time,
-cisterna volume, protein production rate).
+and cell-physiology parameters (donor concentrations, total glycan influx
+concentration).
 """
 
 import ast
@@ -32,9 +32,8 @@ try:
         DIST_MATRIX,
         DONOR_CONC,
         ENZYME_RULES,
-        PROTEIN_PROD_RATE,
-        COMPARTMENT_VOLUME_SINGLE,
         TAU,
+        TOT_GLYCAN_CONC,
         TOTAL_ENZYME_CONC,
         _BASE_ENZYME_NAMES,
         build_enzyme_dist,
@@ -50,14 +49,11 @@ finally:
     sys.path.pop(0)
 
 _BASE_ENZYME_NAMES = list(_BASE_ENZYME_NAMES)
-_N_COMPARTMENTS = len(COMPARTMENT_NAMES)
 
 # ---------------------------------------------------------------------------
 # Default physiology parameters (surfaced to the UI as editable controls).
 # ---------------------------------------------------------------------------
-DEFAULT_TAU = float(TAU[0])
-DEFAULT_COMPARTMENT_VOLUME = float(COMPARTMENT_VOLUME_SINGLE)
-DEFAULT_PROTEIN_PROD_RATE = float(PROTEIN_PROD_RATE)
+DEFAULT_TOT_GLYCAN_CONC = float(TOT_GLYCAN_CONC)
 DEFAULT_DONOR_CONC = {name: float(value) for name, value in DONOR_CONC.items()}
 
 # Donors the user can tune. "H20" is a unit placeholder for hydrolysis
@@ -72,9 +68,7 @@ DONOR_BOUNDS = {
     "GDP-Fuc":    (100.0, 10000.0),
     "GDP-Man":    (100.0, 10000.0),
 }
-TAU_BOUNDS = (0.1, 30.0)
-COMPARTMENT_VOLUME_BOUNDS = (0.1, 20.0)
-PROTEIN_PROD_RATE_BOUNDS = (10.0, 10000.0)
+TOT_GLYCAN_CONC_BOUNDS = (10.0, 50000.0)
 ENZYME_CONC_BOUNDS = (0.0, 100.0)
 
 DEFAULT_ENZYME_CONC = {name: float(value) for name, value in TOTAL_ENZYME_CONC.items()}
@@ -325,22 +319,19 @@ def _run_model(
     dist_matrix: np.ndarray,
     donor_concs: dict[str, float],
     enzyme_concs: dict[str, float],
-    tau_scalar: float,
-    compartment_volume: float,
-    protein_prod_rate: float,
+    tot_glycan_conc: float,
     top_n: int = 15,
 ) -> dict:
     """Run one steady-state prediction and return the top glycoforms."""
-    tau = np.full(_N_COMPARTMENTS, tau_scalar)
+    # Residence time stays an internal model parameter (config.TAU); the user
+    # only controls the total glycan influx concentration.
+    tau = np.asarray(TAU, dtype=float)
     enzyme_dist = build_enzyme_dist(dist_matrix, enzyme_concs)
 
     # Build the full donor table (including the fixed H20 placeholder).
     full_donor_conc = dict(DEFAULT_DONOR_CONC)
     full_donor_conc.update(donor_concs)
 
-    # Total glycan concentration per compartment from physiology parameters
-    # (Krambeck-style): influx glycan mass = q_p * tau / V_cisterna.
-    tot_glycan_conc = protein_prod_rate * tau_scalar / compartment_volume
     initial_feed = np.zeros(_n_structs)
     initial_feed[:2] = 0.5 * tot_glycan_conc
 
@@ -358,9 +349,7 @@ def _run_model_queued(
     dist_matrix: np.ndarray,
     donor_concs: dict[str, float],
     enzyme_concs: dict[str, float],
-    tau_scalar: float,
-    compartment_volume: float,
-    protein_prod_rate: float,
+    tot_glycan_conc: float,
     top_n: int = 15,
 ) -> tuple[dict, bool]:
     """Serialize expensive solves and reuse a bounded set of identical results."""
@@ -371,9 +360,7 @@ def _run_model_queued(
         normalized.astype(np.float64).tobytes(),
         donor_key,
         enzyme_key,
-        float(tau_scalar),
-        float(compartment_volume),
-        float(protein_prod_rate),
+        float(tot_glycan_conc),
         int(top_n),
     )
     with _PREDICTION_LOCK:
@@ -382,10 +369,7 @@ def _run_model_queued(
             _PREDICTION_CACHE[key] = cached
             return deepcopy(cached), True
 
-        result = _run_model(
-            normalized, donor_concs, enzyme_concs, tau_scalar, compartment_volume,
-            protein_prod_rate, top_n,
-        )
+        result = _run_model(normalized, donor_concs, enzyme_concs, tot_glycan_conc, top_n)
         _PREDICTION_CACHE[key] = deepcopy(result)
         while len(_PREDICTION_CACHE) > _PREDICTION_CACHE_LIMIT:
             _PREDICTION_CACHE.popitem(last=False)
@@ -396,9 +380,7 @@ def predict(
     enzyme_distribution,
     donor_concs=None,
     enzyme_concs=None,
-    tau=None,
-    compartment_volume=None,
-    protein_prod_rate=None,
+    tot_glycan_conc=None,
     top_n: int = 15,
 ) -> dict:
     """
@@ -413,9 +395,9 @@ def predict(
         Override defaults for any of the five tunable donors.
     enzyme_concs : dict[str, float], optional
         Override defaults for the total concentration (uM) of any base enzyme.
-    tau, compartment_volume, protein_prod_rate : float, optional
-        Residence time per cisterna (min), single-cisterna volume (uL), and
-        protein production rate (uM/min). Defaults come from config.py.
+    tot_glycan_conc : float, optional
+        Total glycan concentration per compartment (uM). Defaults come from
+        config.py.
     top_n : int
         Number of top glycoforms to return.
 
@@ -427,17 +409,12 @@ def predict(
     dist_matrix = _distribution_to_dist_matrix(enzyme_distribution)
     donor = _validate_donor_concs(donor_concs)
     enzymes = _validate_enzyme_concs(enzyme_concs)
-    tau_v = _validate_scalar(tau, "tau", TAU_BOUNDS, DEFAULT_TAU)
-    vol_v = _validate_scalar(
-        compartment_volume, "compartmentVolume", COMPARTMENT_VOLUME_BOUNDS,
-        DEFAULT_COMPARTMENT_VOLUME,
-    )
-    rate_v = _validate_scalar(
-        protein_prod_rate, "proteinProdRate", PROTEIN_PROD_RATE_BOUNDS,
-        DEFAULT_PROTEIN_PROD_RATE,
+    glycan_v = _validate_scalar(
+        tot_glycan_conc, "totGlycanConc", TOT_GLYCAN_CONC_BOUNDS,
+        DEFAULT_TOT_GLYCAN_CONC,
     )
 
-    result, cache_hit = _run_model_queued(dist_matrix, donor, enzymes, tau_v, vol_v, rate_v, top_n)
+    result, cache_hit = _run_model_queued(dist_matrix, donor, enzymes, glycan_v, top_n)
 
     top_ids = {item["id"] for item in result["top"]}
     top_structures = [s for s in _build_structures() if s["id"] in top_ids]
@@ -446,10 +423,7 @@ def predict(
         "enzymeDistribution": _matrix_to_distribution(dist_matrix),
         "enzymeConcs": enzymes,
         "donorConcs": donor,
-        "tau": tau_v,
-        "compartmentVolume": vol_v,
-        "proteinProdRate": rate_v,
-        "totGlycanConc": round(rate_v * tau_v / vol_v, 6),
+        "totGlycanConc": glycan_v,
         "total": result["total"],
         "top": result["top"],
         "structures": top_structures,
@@ -468,13 +442,6 @@ def get_config_payload() -> dict:
         "donorNames": list(TUNABLE_DONORS),
         "donorDefaults": {name: DEFAULT_DONOR_CONC[name] for name in TUNABLE_DONORS},
         "donorBounds": {name: list(bounds) for name, bounds in DONOR_BOUNDS.items()},
-        "tauDefault": DEFAULT_TAU,
-        "tauBounds": list(TAU_BOUNDS),
-        "compartmentVolumeDefault": DEFAULT_COMPARTMENT_VOLUME,
-        "compartmentVolumeBounds": list(COMPARTMENT_VOLUME_BOUNDS),
-        "proteinProdRateDefault": DEFAULT_PROTEIN_PROD_RATE,
-        "proteinProdRateBounds": list(PROTEIN_PROD_RATE_BOUNDS),
-        "totGlycanConcDefault": round(
-            DEFAULT_PROTEIN_PROD_RATE * DEFAULT_TAU / DEFAULT_COMPARTMENT_VOLUME, 6
-        ),
+        "totGlycanConcDefault": DEFAULT_TOT_GLYCAN_CONC,
+        "totGlycanConcBounds": list(TOT_GLYCAN_CONC_BOUNDS),
     }

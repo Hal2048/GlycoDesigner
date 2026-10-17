@@ -32,103 +32,23 @@
             <div class="param-grid">
               <article class="param-card">
                 <header class="param-card-header">
-                  <h3>Residence time (τ)</h3>
-                  <span class="param-unit">min</span>
+                  <h3>Total glycan concentration</h3>
+                  <span class="param-unit"></span>
                 </header>
                 <div class="param-body">
-                  <input
-                    type="range"
-                    class="param-slider"
-                    :min="config.tauBounds[0]"
-                    :max="config.tauBounds[1]"
-                    step="0.01"
-                    v-model.number="params.tau"
-                    :aria-label="`Residence time per cisterna in minutes`"
-                  />
-                  <div class="number-wrap">
+                  <div class="number-wrap glycan-conc-wrap">
                     <input
                       type="number"
-                      :min="config.tauBounds[0]"
-                      :max="config.tauBounds[1]"
-                      step="0.01"
-                      inputmode="decimal"
-                      v-model.number="params.tau"
-                      aria-label="Residence time per cisterna"
-                    />
-                    <span aria-hidden="true">min</span>
-                  </div>
-                </div>
-              </article>
-
-              <article class="param-card">
-                <header class="param-card-header">
-                  <h3>Cisterna volume (V)</h3>
-                  <span class="param-unit">µL</span>
-                </header>
-                <div class="param-body">
-                  <input
-                    type="range"
-                    class="param-slider"
-                    :min="config.compartmentVolumeBounds[0]"
-                    :max="config.compartmentVolumeBounds[1]"
-                    step="0.01"
-                    v-model.number="params.compartmentVolume"
-                    aria-label="Single cisterna volume in microliters"
-                  />
-                  <div class="number-wrap">
-                    <input
-                      type="number"
-                      :min="config.compartmentVolumeBounds[0]"
-                      :max="config.compartmentVolumeBounds[1]"
-                      step="0.01"
-                      inputmode="decimal"
-                      v-model.number="params.compartmentVolume"
-                      aria-label="Single cisterna volume"
-                    />
-                    <span aria-hidden="true">µL</span>
-                  </div>
-                </div>
-              </article>
-
-              <article class="param-card">
-                <header class="param-card-header">
-                  <h3>Protein production rate (q)</h3>
-                  <span class="param-unit">µM/min</span>
-                </header>
-                <div class="param-body">
-                  <input
-                    type="range"
-                    class="param-slider"
-                    :min="config.proteinProdRateBounds[0]"
-                    :max="config.proteinProdRateBounds[1]"
-                    step="1"
-                    v-model.number="params.proteinProdRate"
-                    aria-label="Protein production rate in uM per minute"
-                  />
-                  <div class="number-wrap">
-                    <input
-                      type="number"
-                      :min="config.proteinProdRateBounds[0]"
-                      :max="config.proteinProdRateBounds[1]"
+                      :min="config.totGlycanConcBounds[0]"
+                      :max="config.totGlycanConcBounds[1]"
                       step="1"
                       inputmode="decimal"
-                      v-model.number="params.proteinProdRate"
-                      aria-label="Protein production rate"
+                      v-model.number="params.totGlycanConc"
+                      aria-label="Total glycan concentration"
                     />
-                    <span aria-hidden="true">µM/min</span>
+                    <span aria-hidden="true">µM</span>
                   </div>
                 </div>
-              </article>
-
-              <article class="param-card computed-card">
-                <header class="param-card-header">
-                  <h3>Total glycan concentration</h3>
-                  <span class="param-unit">µM</span>
-                </header>
-                <div class="computed-value" aria-live="polite">
-                  {{ formatConcentration(totGlycanConc) }}
-                </div>
-                <p class="computed-formula">= q · τ / V</p>
               </article>
             </div>
           </section>
